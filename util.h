@@ -16,7 +16,11 @@
 #define	IKOT_HOST           0x00000003
 #define	IKOT_HOST_PRIV      0x00000004
 #define IO_BITS_ACTIVE      0x80000000
+#ifdef UNTETHER
+#define OOL_COUNT           1024
+#else
 #define OOL_COUNT           5
+#endif
 
 #define koffsetof(struct, entry) kinfo->offsets.struct.entry
 
@@ -35,7 +39,6 @@ extern mach_port_t (*IOServiceGetMatchingService)(mach_port_t, CFDictionaryRef);
 extern int (*IOMobileFramebufferOpen)(mach_port_t, mach_port_t, uint32_t, void *);
 extern int (*IOMobileFramebufferGetLayerDefaultSurface)(mach_port_t, int, void *);
 
-void print_log(const char *fmt, ...);
 int init_io(void);
 void get_ios_version(uint32_t *output);
 CFNumberRef CFNUM(uint32_t value);

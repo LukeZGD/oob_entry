@@ -9,20 +9,6 @@ mach_port_t (*IOServiceGetMatchingService)(mach_port_t, CFDictionaryRef) = NULL;
 int (*IOMobileFramebufferOpen)(mach_port_t, mach_port_t, uint32_t, void *) = NULL;
 int (*IOMobileFramebufferGetLayerDefaultSurface)(mach_port_t, int, void *) = NULL;
 
-void print_log(const char *fmt, ...) {
-    static bool log_opened;
-    if (!log_opened) {
-        openlog("oob_entry", LOG_PID | LOG_CONS, LOG_USER);
-        log_opened = true;
-    }
-    
-    va_list va;
-    va_start(va, fmt);
-    vsyslog(LOG_ERR, fmt, va);
-    vfprintf(stderr, fmt, va);
-    va_end(va);
-}
-
 int init_io(void) {
     void *io_handle = dlopen("/System/Library/Frameworks/IOSurface.framework/IOSurface", RTLD_NOW);
     if (io_handle == NULL) {

@@ -46,6 +46,7 @@ typedef struct {
 
 extern kinfo_t *kinfo;
 
+void print_log(const char *fmt, ...);
 int run_exploit(void);
 
 #endif /* oob_entry_h */
